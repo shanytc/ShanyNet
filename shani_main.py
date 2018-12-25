@@ -481,7 +481,7 @@ def main():
     cfg = Cfg()
     cfg.test_data_dirpath = '/Users/i337936/Documents/shany_net/shany_net/dataset/test' if _DEV_ == True else '/ib/junk/junk/shany_ds/shany_proj/dataset/test'
     cfg.train_data_dirpath = '/Users/i337936/Documents/shany_net/shany_net/dataset/train' if _DEV_ == True else '/ib/junk/junk/shany_ds/shany_proj/dataset/train'
-    cfg.train_save_model_path = '/Users/i337936/Documents/shany_net/shany_net/model/111bbee11.h5' if _DEV_ == True else '/ib/junk/junk/shany_ds/shany_proj/model/111bbee11.h5'
+    cfg.train_save_model_path = '/Users/i337936/Documents/shany_net/shany_net/model/model.h5' if _DEV_ == True else '/ib/junk/junk/shany_ds/shany_proj/model/111bbee11.h5'
     #model = trainval(cfg)[0][0]
     # test(cfg)
 
