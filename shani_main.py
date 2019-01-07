@@ -155,6 +155,7 @@ def pil_loader(path):
     with open(path, 'rb') as f:
         img = Image.open(f)
         img.load()
+        img = img.convert('RGB')
     return img
 
 
@@ -218,12 +219,13 @@ class Cfg(object):
         self.train_save_model_path = ''
         self.train_epochs_amt_limit = 100
         self.train_accuracy_limit = 1
-        self.train_val_based_stop_f = lambda acc_list: True if len(acc_list) >= 1 else False
+        self.train_val_based_stop_f = lambda acc_list: False
 
         self.train_use_gpu = torch.cuda.is_available()
-        self.train_net_cfg = (shany18, {'num_classes': 2})
+        self.train_net_cfg = (shany18, {'num_classes': 100})
         self.train_data_transform = tv.transforms.Compose([
             tv.transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
+            tv.transforms.Resize(224),
             tv.transforms.RandomHorizontalFlip(),
             tv.transforms.ToTensor(),
             tv.transforms.Normalize(
@@ -235,7 +237,7 @@ class Cfg(object):
         self.train_SGD_momentum = 0.9
         self.train_lr_f = lambda epoch_num: self.train_init_lr
         self.train_dataloader_batch_size = 16
-        self.train_dataloader_workers_amt = 1
+        self.train_dataloader_workers_amt = 20
         self.train_loss = nn.CrossEntropyLoss()
         self.train_trainval = True
 
@@ -373,19 +375,19 @@ def infer_folder(cfg=Cfg(), model=None, print_inference_progress=True, print_inf
             # print(filepaths, outputs)
             # print(filepaths, )
             embeddings = model.forward2(inputs)
-            for filepath, embedding in zip(filepaths, embeddings.data.cpu().numpy().tolist()):
-                print(filepath)
-                with open(filepath+'.txt','w') as f:
-                    f.write(str(embedding))
-                break
+            # for filepath, embedding in zip(filepaths, embeddings.data.cpu().numpy().tolist()):
+            #     print(filepath)
+            #     with open(filepath+'.txt','w') as f:
+            #         f.write(str(embedding))
+            #     break
 
             _, predicted = torch.max(outputs.data, 1)
 
             softmax_results = softmax(outputs.data.cpu().numpy().T).T
             scores = np.max(softmax_results.T, axis=0).T
             classes = np_classes[np.argmax(softmax_results.T, axis=0)]
-            for softmax_res, score, cls, filepath in zip(softmax_results, scores, classes, filepaths):
-                img_res = (filepath, (str(cls), float(score)), (cfg.infer_folder_classes_list, softmax_res.tolist()))
+            for softmax_res, score, cls, filepath, embedding in zip(softmax_results, scores, classes, filepaths, embeddings.data.cpu().numpy().tolist()):
+                img_res = (filepath, (str(cls), float(score)), (cfg.infer_folder_classes_list, softmax_res.tolist()), embedding)
                 infered_imgs_amt += 1
                 if print_inference_results:
                     print(infered_imgs_amt, img_res)
@@ -402,8 +404,8 @@ def trainval(cfg=Cfg(), model=None, train_dataset=None, train_dataloader=None, t
     print('TRAINVAL trainDS %s, testDS %s with model %s' % (cfg.train_data_dirpath, cfg.test_data_dirpath,
                                                            type(model) if model else cfg.test_model_path))
 
-    train_dataset, train_dataloader = train_get_dataset_and_dataloader(cfg, train_dataset, train_dataloader, cached=True)
-    test_dataset, test_dataloader = test_get_dataset_and_dataloader(cfg, test_dataset, test_dataloader, cached=True)
+    train_dataset, train_dataloader = train_get_dataset_and_dataloader(cfg, train_dataset, train_dataloader)#, cached=True)
+    test_dataset, test_dataloader = test_get_dataset_and_dataloader(cfg, test_dataset, test_dataloader)#, cached=True)
     assert train_dataset.classes == test_dataset.classes
 
     epoch_acc_history = []
@@ -478,21 +480,41 @@ def trainval(cfg=Cfg(), model=None, train_dataset=None, train_dataloader=None, t
 _DEV_ = False
 
 def main():
-    cfg = Cfg()
-    cfg.test_data_dirpath = '/Users/i337936/Documents/shany_net/shany_net/dataset/test' if _DEV_ == True else '/ib/junk/junk/shany_ds/shany_proj/dataset/test'
-    cfg.train_data_dirpath = '/Users/i337936/Documents/shany_net/shany_net/dataset/train' if _DEV_ == True else '/ib/junk/junk/shany_ds/shany_proj/dataset/train'
-    cfg.train_save_model_path = '/Users/i337936/Documents/shany_net/shany_net/model/model.h5' if _DEV_ == True else '/ib/junk/junk/shany_ds/shany_proj/model/111bbee11.h5'
-    #model = trainval(cfg)[0][0]
-    # test(cfg)
+    # import os
+    # for i in os.listdir('/ib/junk/junk/shany_ds/shany_proj/dataset/train'):
+    #     print(i, 'check')
+    #     print(os.listdir(f'/ib/junk/junk/shany_ds/shany_proj/dataset/train/{i}'))
+    #     assert os.listdir(f'/ib/junk/junk/shany_ds/shany_proj/dataset/train/{i}')
+    # return
 
-    # use saved model
-    cfg.test_model_path = cfg.train_save_model_path
+    cfg = Cfg()
+    cfg.test_data_dirpath = '/Users/i337936/Documents/shany_net/shany_net/dataset/test' if _DEV_ == True else \
+        '/ib/junk/junk/shany_ds/shany_proj/dataset/test'
+    cfg.train_data_dirpath = '/Users/i337936/Documents/shany_net/shany_net/dataset/train' if _DEV_ == True else \
+        '/ib/junk/junk/shany_ds/shany_proj/dataset/train'
+    cfg.train_save_model_path = '/Users/i337936/Documents/shany_net/shany_net/model/model.h5' if _DEV_ == True else \
+        '/ib/junk/junk/shany_ds/shany_proj/model/model.h5'
+
+    cfg.train_net_cfg[1]['num_classes'] = len(os.listdir(cfg.train_data_dirpath))
+
+    # train
+    # model = trainval(cfg)[0][0]
+
+
+    # test
+    # cfg.test_model_path = cfg.train_save_model_path
+    # test(cfg)
+    # return
 
     # inference
-    cfg.test_data_dirpath = '/Users/i337936/Documents/landmarks/src/dataset/index/1' if _DEV_ else '/ib/junk/junk/shany_ds/shany_proj/dataset/inference'
-    cfg.infer_folder_classes_list = ['189', '399']
+    cfg.test_model_path = cfg.train_save_model_path
+    cfg.test_data_dirpath = '/Users/i337936/Documents/landmarks/src/dataset/index/1' if _DEV_ else \
+        '/ib/junk/junk/shany_ds/shany_proj/dataset/inference'
+    cfg.infer_folder_classes_list = sorted(os.listdir(cfg.train_data_dirpath))
     res = infer_folder(cfg)
-    print(res)
+    import json
+    with open('res.json', 'w') as f:
+        json.dump(res, f, sort_keys=True, indent=4)
 
 if __name__ == '__main__':
     main()
