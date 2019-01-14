@@ -387,7 +387,8 @@ def infer_folder(cfg=Cfg(), model=None, print_inference_progress=True, print_inf
             scores = np.max(softmax_results.T, axis=0).T
             classes = np_classes[np.argmax(softmax_results.T, axis=0)]
             for softmax_res, score, cls, filepath, embedding in zip(softmax_results, scores, classes, filepaths, embeddings.data.cpu().numpy().tolist()):
-                img_res = (filepath, (str(cls), float(score)), (cfg.infer_folder_classes_list, softmax_res.tolist()), embedding)
+                #img_res = (filepath, (str(cls), float(score)), (cfg.infer_folder_classes_list, softmax_res.tolist()), embedding)
+                img_res = (filepath, (str(cls), float(score)), embedding)
                 infered_imgs_amt += 1
                 if print_inference_results:
                     print(infered_imgs_amt, img_res)
@@ -507,13 +508,14 @@ def main():
     # return
 
     # inference
+    file = 23
     cfg.test_model_path = cfg.train_save_model_path
     cfg.test_data_dirpath = '/Users/i337936/Documents/landmarks/src/dataset/index/1' if _DEV_ else \
-        '/ib/junk/junk/shany_ds/shany_proj/dataset/inference'
+        '/ib/junk/junk/shany_ds/shany_proj/dataset/inference/'+str(file)
     cfg.infer_folder_classes_list = sorted(os.listdir(cfg.train_data_dirpath))
     res = infer_folder(cfg)
     import json
-    with open('res.json', 'w') as f:
+    with open(str(file)+'.json', 'w') as f:
         json.dump(res, f, sort_keys=True, indent=4)
 
 if __name__ == '__main__':
