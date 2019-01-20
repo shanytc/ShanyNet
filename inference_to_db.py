@@ -29,19 +29,21 @@ def addRow(conn=None, image=None, _class=None, score=None, embeddings=[], group=
 
 conn = psycopg2.connect( host=hostname, user=username, password=password, dbname=database )
 
+files = [81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109]
+for group in files:
+    with open(f'/Users/i337936/Downloads/inference/{group}.json') as data_file:
+        print(f"Loading {group}.json...")
+        data = json.load(data_file)
 
-group = 5
-with open(f'/Users/i337936/Downloads/inference/{group}.json') as data_file:
-    print("Loading Json...")
-    data = json.load(data_file)
+        print(f"Importing {group}.json...")
+        for d in data:
+            name = d[0].replace("/ib/junk/junk/shany_ds/shany_proj/dataset/inference/","")
+            _class = d[1][0]
+            score = d[1][1]
+            embeddingData = d[2]
+            addRow(conn, name, _class, score, embeddingData, group)
 
-    print("Importing data...")
-    for d in data:
-        name = d[0].replace("/ib/junk/junk/shany_ds/shany_proj/dataset/inference/","")
-        _class = d[1][0]
-        score = d[1][1]
-        embeddingData = d[2]
-        addRow(conn, name, _class, score, embeddingData, group)
+    print(f"Import complete: {group}.json")
 
-print('Import complete')
+print(f"Import complete!")
 conn.close()

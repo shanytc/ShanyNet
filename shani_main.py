@@ -508,15 +508,18 @@ def main():
     # return
 
     # inference
-    file = 23
     cfg.test_model_path = cfg.train_save_model_path
-    cfg.test_data_dirpath = '/Users/i337936/Documents/landmarks/src/dataset/index/1' if _DEV_ else \
-        '/ib/junk/junk/shany_ds/shany_proj/dataset/inference/'+str(file)
     cfg.infer_folder_classes_list = sorted(os.listdir(cfg.train_data_dirpath))
-    res = infer_folder(cfg)
-    import json
-    with open(str(file)+'.json', 'w') as f:
-        json.dump(res, f, sort_keys=True, indent=4)
+    files = [82]
+    for group in files:
+        print("Inferencing " + str(group) + "...")
+        cfg.test_data_dirpath = '/Users/i337936/Documents/landmarks/src/dataset/index/1' if _DEV_ else \
+            '/ib/junk/junk/shany_ds/shany_proj/dataset/inference/'+str(group)
+        res = infer_folder(cfg)
+        import json
+        with open(str(group)+'.json', 'w') as f:
+            json.dump(res, f, sort_keys=True, indent=4)
+        print(str(group) + " inference complete")
 
 if __name__ == '__main__':
     main()
