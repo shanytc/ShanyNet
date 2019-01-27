@@ -254,7 +254,7 @@ class Cfg(object):
             )
         ])
         self.test_dataloader_batch_size = self.train_dataloader_batch_size
-        self.test_dataloader_workers_amt = self.train_dataloader_workers_amt
+        self.test_dataloader_workers_amt = 0 #self.train_dataloader_workers_amt
 
         self.infer_folder_classes_list = []
 
