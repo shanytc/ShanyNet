@@ -1,6 +1,6 @@
 from app import app
 from server import ml
-from flask import request
+from flask import request, send_file
 import os
 from werkzeug import secure_filename
 import pandas as pd
@@ -78,8 +78,11 @@ def upload():
     resp.status_code = 200
     return resp
 
+@app.route('/image/<path>/<img>', methods=['GET'])
+def image(path, img):
+    filename = "/ib/junk/junk/shany_ds/shany_proj/server/app/static/" + str(path) + '/' + str(img)
+    return send_file(filename, mimetype='image/jpeg')
 
 @app.route('/')
-@app.route('/index')
 def index():
     return "nothing to see here"

@@ -1,23 +1,30 @@
 angular.module('shanyNet', [])
 .controller('ShanyNetController', ['$rootScope', '$scope','fileUpload', function($rootScope, $scope, fileUpload) {
     this.isRunning = false;
+    this.results = [];
 
     $rootScope.$on('finishedInference', function (event, data) {
         this.isRunning = false;
-        console.log(data);
-    });
+        this.results = data;
+    }.bind(this));
 
     this.uploadFile = function() {
         var file = $scope.myFile;
         this.isRunning = true;
+        this.results = [];
+
         //console.dir(file);
         var uploadUrl = "http://iltlvl914:5005/upload";
         fileUpload.uploadFileToUrl(file, uploadUrl);
     };
 
+    this.getResults = function(){
+        return this.results;
+    };
+
     this.getIsRunning = function(){
         return this.isRunning;
-    }
+    };
 }])
 .directive('fileModel', ['$parse', function ($parse) {
     return {
