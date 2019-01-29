@@ -6,7 +6,7 @@ from werkzeug import secure_filename
 import pandas as pd
 import numpy as np
 from time import time
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 from flask import jsonify
 
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
@@ -16,6 +16,13 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+filename = '/ib/junk/junk/shany_ds/shany_proj/server/100k.csv'
+print("Loading embeddings into memory...")
+start = time()
+data = pd.read_csv(filename, delimiter=',')
+
+print("Creating matrix...")
+embed = data.iloc[:, 3:515].as_matrix()
 
 def inferAll():
     print("Inference crunching time...")
@@ -23,19 +30,9 @@ def inferAll():
 
     print("Got embeddings!")
     original_embed = res[0][2]
-    # original_embed = np.random.uniform(low=0, high=1, size=(512,))
-    ### scan embeddingsa
+    ### scan embedding
 
-    filename = '/ib/junk/junk/shany_ds/shany_proj/server/100k.csv'
     similatirties = []
-
-
-    print("Loading embeddings into memory...")
-    start = time()
-    data = pd.read_csv(filename, delimiter=',')
-
-    print("Creating matrix...")
-    embed = data.iloc[:, 3:515].as_matrix()
 
     print("finding nearest neighbhoors...")
     similatirties = cosine_similarity([original_embed], embed)[0]

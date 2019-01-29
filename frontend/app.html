@@ -1,6 +1,7 @@
 <!doctype html>
 <html ng-app="shanyNet">
 <head>
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.7.6/angular.min.js"></script>
     <script src="resources/js/app.js"></script>
@@ -13,44 +14,39 @@
     <link rel="stylesheet" href="resources/css/app.css">
 </head>
 <body>
-<nav class="navbar navbar-default">
-    <div class="container-fluid">
-        <div class="navbar-header">
-            <a class="navbar-brand" href="#">
-                <img style="float:left; margin-right:15px;" alt="Brand" width="20" height="20" src="resources/images/logo.png">
-                ShanyNet
-            </a>
-        </div>
-    </div>
-</nav>
-<div class="container" ng-controller="ShanyNetController as ctrl">
-    <div class="row">
-        <div class="col-lg-6">
-            <div class="form-group">
-                <label for="exampleInputFile">File input</label>
-                <input type = "file" file-model = "myFile"/><br/>
-                <p class="help-block">Select an image to search...</p>
+    <nav class="navbar navbar-default">
+        <div class="container-fluid">
+            <div class="navbar-header">
+                <a class="navbar-brand" href="#">
+                    <img style="float:left; margin-right:15px;" alt="Brand" width="20" height="20" src="resources/images/logo.png">
+                    ShanyNet
+                </a>
             </div>
-            <button ng-click = "ctrl.uploadFile()" class="btn btn-primary">Upload</button>
-
-            <img ng-src="ctrl.getImage()" alt="">
         </div>
-        <div class="col-lg-6 text-left">
-            <div ng-if="ctrl.getIsRunning()">
-                <div class="sk-folding-cube">
-                    <div class="sk-cube1 sk-cube"></div>
-                    <div class="sk-cube2 sk-cube"></div>
-                    <div class="sk-cube4 sk-cube"></div>
-                    <div class="sk-cube3 sk-cube"></div>
+    </nav>
+    <div class="container" ng-controller="ShanyNetController as ctrl">
+        <div class="row">
+            <div class="col-lg-3">
+                <div class="form-group">
+                    <input type = "file" file-model = "myFile"/>
                 </div>
+                <button ng-click = "ctrl.uploadFile()" class="btn btn-primary">Search</button><br/><br/>
+                <img style="width:150px; height:150px;" id="seletedImage" src="" alt="">
             </div>
-            <div ng-if="!ctrl.getIsRunning() && ctrl.getResults().length">
-                <div ng-repeat="img in ctrl.getResults()">
-                    {{img}}
+            <div class="col-lg-9 text-left">
+                <div ng-if="ctrl.getIsRunning()">
+                    <div class="sk-folding-cube">
+                        <div class="sk-cube1 sk-cube"></div>
+                        <div class="sk-cube2 sk-cube"></div>
+                        <div class="sk-cube4 sk-cube"></div>
+                        <div class="sk-cube3 sk-cube"></div>
+                    </div>
+                </div>
+                <div ng-if="!ctrl.getIsRunning() && ctrl.getResults().length" style="display: flex; flex-flow:row wrap; justify-content: center;">
+                    <div ng-repeat="img in ctrl.getResults()" style='margin-right:10px; margin-bottom:10px; flex: 1 1 300px; width: 300px; height: 300px; background-size: cover; background-image: url("{{ctrl.getImageLink(img)}}")'></div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 </body>
 </html>

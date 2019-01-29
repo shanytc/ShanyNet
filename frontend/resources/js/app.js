@@ -25,6 +25,10 @@ angular.module('shanyNet', [])
     this.getIsRunning = function(){
         return this.isRunning;
     };
+
+    this.getImageLink = function(image){
+        return 'http://iltlvl914:5005/image/' + image[3] + '/' + encodeURI(image[2])
+    }
 }])
 .directive('fileModel', ['$parse', function ($parse) {
     return {
@@ -32,9 +36,14 @@ angular.module('shanyNet', [])
         link: function(scope, element, attrs) {
             var model = $parse(attrs.fileModel);
             var modelSetter = model.assign;
+            var fr=new FileReader();
 
             element.bind('change', function() {
                 scope.$apply(function() {
+                    fr.onload = function(e) {
+                        $('#seletedImage')[0].src = this.result;
+                    };
+                    fr.readAsDataURL(element[0].files[0]);
                     modelSetter(scope, element[0].files[0]);
                 });
             });
