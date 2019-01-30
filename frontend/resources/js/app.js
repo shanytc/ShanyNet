@@ -60,7 +60,7 @@ angular.module('shanyNet', [])
     this.uploadFileToUrl = function(file, uploadUrl) {
         var algo = $('input[type=radio][name=algo]:checked').val();
         var search = $('input[type=radio][name=search]:checked').val();
-        var results = $('#num_of_results').val()
+        var results = $('#num_of_results').val();
 
         var fd = new FormData();
         fd.append('file', file);

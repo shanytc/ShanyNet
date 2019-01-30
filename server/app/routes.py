@@ -36,12 +36,12 @@ def generateLuckyData(file):
     _data = skShuffle(_data)
 
     print("Restricting lucky factor...")
-    _data = _data.iloc[:50000]  # 100k
+    _data = _data.iloc[:10000]
 
     print("Creating matrix...")
     embed = _data.iloc[:, 3:515].as_matrix()
 
-    buildAnnoy('lucky')
+    buildAnnoy('lucky', 10)
 
     print("I'm feeling lucky is ready!")
 
@@ -58,7 +58,7 @@ def loadData(file):
 
     print('Data loaded successfully.')
 
-def buildAnnoy(file):
+def buildAnnoy(file, treeSize=100):
     filename = '/ib/junk/junk/shany_ds/shany_proj/server/'+file+'.ann'
 
     print("Creating annoy index...")
@@ -71,7 +71,7 @@ def buildAnnoy(file):
         i+=1
 
     print("Creating annoy tree...")
-    t.build(100) # 10 trees
+    t.build(treeSize)
 
     print("Saving annoy..")
     t.save(filename)
