@@ -1,11 +1,16 @@
 angular.module('shanyNet', [])
 .controller('ShanyNetController', ['$rootScope', '$scope','fileUpload', function($rootScope, $scope, fileUpload) {
     this.isRunning = false;
+    this.readyToSearch = false;
     this.results = [];
 
     $rootScope.$on('finishedInference', function (event, data) {
         this.isRunning = false;
         this.results = data;
+    }.bind(this));
+
+    $rootScope.$on('readyToUpload', function () {
+        this.readyToSearch = true;
     }.bind(this));
 
     this.uploadFile = function() {
@@ -30,7 +35,7 @@ angular.module('shanyNet', [])
         return 'http://iltlvl914:5005/image/' + image[3] + '/' + encodeURI(image[2])
     }
 }])
-.directive('fileModel', ['$parse', function ($parse) {
+.directive('fileModel', ['$rootScope','$parse', function ($rootScope, $parse) {
     return {
         restrict: 'A',
         link: function(scope, element, attrs) {
@@ -40,6 +45,7 @@ angular.module('shanyNet', [])
 
             element.bind('change', function() {
                 scope.$apply(function() {
+                    $rootScope.$emit('readyToUpload');
                     fr.onload = function(e) {
                         $('#seletedImage')[0].src = this.result;
                     };
@@ -52,8 +58,15 @@ angular.module('shanyNet', [])
 }])
 .service('fileUpload', ['$rootScope','$http', function ($rootScope, $http) {
     this.uploadFileToUrl = function(file, uploadUrl) {
+        var algo = $('input[type=radio][name=algo]:checked').val();
+        var search = $('input[type=radio][name=search]:checked').val();
+        var results = $('#num_of_results').val()
+
         var fd = new FormData();
         fd.append('file', file);
+        fd.append('algo', algo);
+        fd.append('search', search);
+        fd.append('results', results);
 
         $http.post(uploadUrl, fd, {
             transformRequest: angular.identity,

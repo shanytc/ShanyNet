@@ -11,6 +11,7 @@
 
     <!-- Optional theme -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.0/css/all.css" integrity="sha384-lZN37f5QGtY3VHgisS14W3ExzMWZxybE1SJSEsQp9S+oqd12jhcu+A56Ebc1zFSJ" crossorigin="anonymous">
     <link rel="stylesheet" href="resources/css/app.css">
 </head>
 <body>
@@ -27,11 +28,47 @@
     <div class="container" ng-controller="ShanyNetController as ctrl">
         <div class="row">
             <div class="col-lg-3">
-                <div class="form-group">
-                    <input type = "file" file-model = "myFile"/>
+                <div class="panel panel-default">
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <button class="btn btn-success" onclick="document.getElementById('fileUploader').click()"><i class="fa fa-upload"></i> Select File</button>
+                            <button ng-disabled="ctrl.isRunning || !ctrl.readyToSearch" ng-click="ctrl.uploadFile()" class="btn btn-primary pull-right">Search</button>
+                            <input id="fileUploader" type="file" file-model="myFile" style="display:none;"/>
+                        </div>
+                        <div>
+                            <strong>Search Algorithm:</strong>
+                            <div style="margin-bottom:10px;">
+                                <input type="radio" name="algo" value="annoy" checked="checked"> KNN (Annoy) - <strong>Faster</strong><br/>
+                                <input type="radio" name="algo" value="cosine"> Cosine Similarity - <strong>Better</strong>
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Search Speed:</strong>
+                            <div style="margin-bottom:10px;">
+                                <input type="radio" name="search" value="lucky"> I'm Feeling Lucky<br/>
+                                <input type="radio" name="search" value="loose"> Loose (10K)<br/>
+                                <input type="radio" name="search" value="fast" checked="checked" checked="checked"> Fast (100K)<br/>
+                                <input type="radio" name="search" value="normal"> Normal (250K)<br/>
+                                <input type="radio" name="search" value="slow"> Slow (500K)<br/>
+                                <input type="radio" name="search" value="deep"> Full (1M)<br/>
+                            </div>
+                        </div>
+                        <div>
+                            <strong>Search Results:</strong>
+                            <div style="margin-bottom:10px;">
+                                <select id="num_of_results" style="width:100%;">
+                                    <option value="10">10</option>
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <img ng-if="ctrl.readyToSearch" style="width:100%;" id="seletedImage" class="img-rounded" src="" alt="">
+                        </div>
+                    </div>
                 </div>
-                <button ng-click = "ctrl.uploadFile()" class="btn btn-primary">Search</button><br/><br/>
-                <img style="width:150px; height:150px;" id="seletedImage" src="" alt="">
             </div>
             <div class="col-lg-9 text-left">
                 <div ng-if="ctrl.getIsRunning()">
@@ -43,7 +80,7 @@
                     </div>
                 </div>
                 <div ng-if="!ctrl.getIsRunning() && ctrl.getResults().length" style="display: flex; flex-flow:row wrap; justify-content: center;">
-                    <div ng-repeat="img in ctrl.getResults()" style='margin-right:10px; margin-bottom:10px; flex: 1 1 300px; width: 300px; height: 300px; background-size: cover; background-image: url("{{ctrl.getImageLink(img)}}")'></div>
+                    <div class="img-thumbnail" ng-repeat="img in ctrl.getResults()" style='margin-right:10px; margin-bottom:10px; flex: 1 1 300px; width: 300px; height: 300px; background-size: cover; background-image: url("{{ctrl.getImageLink(img)}}")'></div>
                 </div>
             </div>
         </div>
