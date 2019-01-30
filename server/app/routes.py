@@ -12,7 +12,7 @@ from sklearn.utils import shuffle as skShuffle
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
 _ALGO_ = 'annoy'
 _SEARCH_ = 'fast'
-_SEARCH_FILE_ = '100k'
+_SEARCH_FILE_ = 100000
 _RESULTS_ = 25
 
 def allowed_file(filename):
@@ -22,15 +22,14 @@ def allowed_file(filename):
 # Global
 data = []
 embed = []
-start = 0
+embed_init = []
 annoyObj = None
 
-def generateLuckyData(file):
+def generateLuckyData():
     global embed
-    filename = '/ib/junk/junk/shany_ds/shany_proj/server/'+file+'.csv'
 
-    print("Loading "+file+".csv into memory for luckiness...")
-    _data = pd.read_csv(filename, delimiter=',')
+    print("Getting magic pill")
+    _data = data
 
     print("Chaos theory is now in motion...")
     _data = skShuffle(_data)
@@ -45,16 +44,33 @@ def generateLuckyData(file):
 
     print("I'm feeling lucky is ready!")
 
+def InitDB():
+    global data, embed
+    filename = '/ib/junk/junk/shany_ds/shany_proj/server/inference.csv'
 
-def loadData(file):
-    global data, embed, start
-    filename = '/ib/junk/junk/shany_ds/shany_proj/server/'+file+'.csv'
-
-    print("Loading "+file+".csv into memory...")
+    print("Loading db into memory...")
     data = pd.read_csv(filename, delimiter=',')
 
     print("Creating matrix...")
     embed = data.iloc[:, 3:515].as_matrix()
+
+    print('Init Data loaded successfully.')
+
+    loadData(_SEARCH_FILE_)
+    loadAnnoy('inference')
+
+def loadData(size = -1):
+    global data, embed
+
+    print("Switching data size..")
+
+    if size != -1:
+        _data = data.iloc[:size]
+    else:
+        _data = data
+
+    print("Creating matrix...")
+    embed = _data.iloc[:, 3:515].as_matrix()
 
     print('Data loaded successfully.')
 
@@ -119,8 +135,7 @@ def inferAll():
 
     return res
 
-loadData(_SEARCH_FILE_)
-loadAnnoy(_SEARCH_FILE_)
+InitDB()
 
 print('ShanyNet Loaded successfully.')
 
@@ -159,25 +174,29 @@ def upload():
                 result['search'] = _SEARCH_
 
                 if _SEARCH_ == 'deep':
-                    _SEARCH_FILE_ = 'inference'
+                    _SEARCH_FILE_ = -1
                     loadData(_SEARCH_FILE_)
+                    loadAnnoy('inference')
                 elif _SEARCH_ == 'slow':
-                    _SEARCH_FILE_ = '500k'
+                    _SEARCH_FILE_ = 500000
                     loadData(_SEARCH_FILE_)
+                    loadAnnoy('500k')
                 elif _SEARCH_ == 'normal':
-                    _SEARCH_FILE_ = '250k'
+                    _SEARCH_FILE_ = 250000
                     loadData(_SEARCH_FILE_)
+                    loadAnnoy('250k')
                 elif _SEARCH_ == 'fast':
-                    _SEARCH_FILE_ = '100k'
+                    _SEARCH_FILE_ = 100000
                     loadData(_SEARCH_FILE_)
+                    loadAnnoy('100k')
                 elif _SEARCH_ == 'loose':
-                    _SEARCH_FILE_ = '10k'
+                    _SEARCH_FILE_ = 10000
                     loadData(_SEARCH_FILE_)
+                    loadAnnoy('10k')
                 elif _SEARCH_ == 'lucky':
                     _SEARCH_FILE_ = 'lucky'
-                    generateLuckyData('100k')
-
-                loadAnnoy(_SEARCH_FILE_)
+                    generateLuckyData()
+                    loadAnnoy(_SEARCH_FILE_)
 
         if file and allowed_file(file.filename):
 
