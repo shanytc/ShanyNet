@@ -14,6 +14,8 @@ _ALGO_ = 'annoy'
 _SEARCH_ = 'fast'
 _SEARCH_FILE_ = 100000
 _RESULTS_ = 25
+_EMBEDDINGS_ = None
+_LAST_FILE_ = ""
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -101,25 +103,39 @@ def loadAnnoy(file):
 
     # use annoy
     print("Creating annoy index...")
-    annoyObj = AnnoyIndex(embed.shape[1])
+
+    if _ALGO_ == 'annoy_euclidean':
+        annoyObj = AnnoyIndex(embed.shape[1], metric='euclidean')
+    elif _ALGO_ == 'annoy_manhattan':
+        annoyObj = AnnoyIndex(embed.shape[1], metric='manhattan')
+    elif _ALGO_ == 'annoy_hamming':
+        annoyObj = AnnoyIndex(embed.shape[1], metric='hamming')
+    elif _ALGO_ == 'annoy_dot':
+        annoyObj = AnnoyIndex(embed.shape[1], metric='dot')
+    else:
+        annoyObj = AnnoyIndex(embed.shape[1])
 
     print("Loading annoy index...")
     annoyObj.load(filename)
 
     print('Annoy loaded successfully.')
 
-def inferAll():
+
+def inferAll(embeddings=None):
     global data, embed, annoyObj
 
-    print("Processing uploaded image...")
-    res = ml.inferImage('')
+    if embeddings is None:
+        print("Processing uploaded image...")
+        res = ml.inferImage('')
 
-    print("Embeddings received.")
-    original_embed = res[0][2]
+        print("Embeddings received.")
+        original_embed = res[0][2]
+    else:
+        original_embed = embeddings
 
     res = []
 
-    if _ALGO_ == 'annoy':
+    if _ALGO_ == 'annoy' or _ALGO_ == 'annoy_euclidean' or _ALGO_ == 'annoy_manhattan' or _ALGO_ == 'annoy_hamming' or _ALGO_ == 'annoy_dot':
         print("Searching using KNN Annoy algorithm...")
 
         u_res = annoyObj.get_nns_by_vector(original_embed, _RESULTS_, -1, True)
@@ -133,7 +149,7 @@ def inferAll():
         res = list(zip(similarities, data.iloc[:, 516], data.iloc[:,0], data.iloc[:,515]))
         res = sorted(res, reverse=True,key=lambda x: x[0])[:_RESULTS_]
 
-    return res
+    return [original_embed, res]
 
 InitDB()
 
@@ -141,7 +157,7 @@ print('ShanyNet Loaded successfully.')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
-    global _ALGO_, _SEARCH_FILE_, _SEARCH_, _RESULTS_
+    global _ALGO_, _SEARCH_FILE_, _SEARCH_, _RESULTS_, _EMBEDDINGS_, _LAST_FILE_
 
     result = {
         'data': [],
@@ -153,6 +169,10 @@ def upload():
 
     if request.method == 'POST':
         file = request.files['file']
+
+        if _LAST_FILE_ != file.filename:
+            _EMBEDDINGS_ = None
+            _LAST_FILE_ = file.filename
 
         if request.form["algo"] is not None:
             algo = request.form["algo"]
@@ -210,7 +230,9 @@ def upload():
 
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            result['data'] = inferAll()
+            res = inferAll(_EMBEDDINGS_)
+            result['data'] = res[1]
+            _EMBEDDINGS_ = res[0]
 
     resp = jsonify(result)
     resp.status_code = 200

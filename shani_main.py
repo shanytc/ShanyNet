@@ -123,7 +123,7 @@ class ShanyNet(nn.Module):
 
 
 def shany18(**kwargs):
-    """Constructs a ResNet-18 model.
+    """Constructs a ResNet-18 based model.
 
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
@@ -481,6 +481,12 @@ def trainval(cfg=Cfg(), model=None, train_dataset=None, train_dataloader=None, t
 _DEV_ = False
 
 def main():
+
+    #model = torch.load("/ib/junk/junk/shany_ds/shany_proj/model/model.h5")
+    #model.cuda()
+    #hl.build_graph(model, torch.zeros([2,2,2,2]))
+
+    # code starts here
     # import os
     # for i in os.listdir('/ib/junk/junk/shany_ds/shany_proj/dataset/train'):
     #     print(i, 'check')

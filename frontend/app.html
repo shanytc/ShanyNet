@@ -38,12 +38,16 @@
                         <div>
                             <strong>Search Algorithm:</strong>
                             <div style="margin-bottom:10px;">
-                                <input type="radio" name="algo" value="annoy" checked="checked"> KNN (Annoy) - <strong>Faster</strong><br/>
-                                <input type="radio" name="algo" value="cosine"> Cosine Similarity - <strong>Better</strong>
+                                <input type="radio" name="algo" value="annoy" checked="checked"> Knn Annoy (Angular)<br/>
+                                <input type="radio" name="algo" value="annoy_euclidean"> Knn Annoy (Cosine)<br/>
+                                <input type="radio" name="algo" value="annoy_manhattan"> Knn Annoy (Manhattan)<br/>
+                                <input type="radio" name="algo" value="annoy_hamming"> knn Annoy (Hamming)<br/>
+                                <input type="radio" name="algo" value="annoy_dot"> Knn Annoy (Dot Product)<br/>
+                                <input type="radio" name="algo" value="cosine"> Cosine Similarity
                             </div>
                         </div>
                         <div>
-                            <strong>Search Speed:</strong>
+                            <strong>Search Space:</strong>
                             <div style="margin-bottom:10px;">
                                 <input type="radio" name="search" value="lucky"> I'm Feeling Lucky<br/>
                                 <input type="radio" name="search" value="loose"> Loose (10K)<br/>
