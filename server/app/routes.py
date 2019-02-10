@@ -15,7 +15,7 @@ _SEARCH_ = 'fast'
 _SEARCH_FILE_ = 100000
 _RESULTS_ = 25
 _EMBEDDINGS_ = None
-_LAST_FILE_ = ""
+_FILE_ = ""
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -120,22 +120,22 @@ def loadAnnoy(file):
 
     print('Annoy loaded successfully.')
 
-
 def inferAll(embeddings=None):
     global data, embed, annoyObj
 
-    if embeddings is None:
+    if embeddings == None:
         print("Processing uploaded image...")
         res = ml.inferImage('')
 
-        print("Embeddings received.")
+        print("Embeddings received from model.")
         original_embed = res[0][2]
     else:
+        print("Using cached embeddings.")
         original_embed = embeddings
 
     res = []
 
-    if _ALGO_ == 'annoy' or _ALGO_ == 'annoy_euclidean' or _ALGO_ == 'annoy_manhattan' or _ALGO_ == 'annoy_hamming' or _ALGO_ == 'annoy_dot':
+    if _ALGO_ == 'annoy':
         print("Searching using KNN Annoy algorithm...")
 
         u_res = annoyObj.get_nns_by_vector(original_embed, _RESULTS_, -1, True)
@@ -157,7 +157,7 @@ print('ShanyNet Loaded successfully.')
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
-    global _ALGO_, _SEARCH_FILE_, _SEARCH_, _RESULTS_, _EMBEDDINGS_, _LAST_FILE_
+    global _ALGO_, _SEARCH_FILE_, _SEARCH_, _RESULTS_, _EMBEDDINGS_, _FILE_
 
     result = {
         'data': [],
@@ -170,9 +170,9 @@ def upload():
     if request.method == 'POST':
         file = request.files['file']
 
-        if _LAST_FILE_ != file.filename:
+        if _FILE_ != file.filename:
+            _FILE_ = file.filename
             _EMBEDDINGS_ = None
-            _LAST_FILE_ = file.filename
 
         if request.form["algo"] is not None:
             algo = request.form["algo"]
@@ -231,8 +231,8 @@ def upload():
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             res = inferAll(_EMBEDDINGS_)
-            result['data'] = res[1]
             _EMBEDDINGS_ = res[0]
+            result['data'] = res[1]
 
     resp = jsonify(result)
     resp.status_code = 200
