@@ -6,8 +6,6 @@ from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Conv2D, MaxPooling2D, Dropout, Flatten
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import History
-from keras.optimizers import Adam
-from sklearn.preprocessing import LabelBinarizer
 import matplotlib.pyplot as plt
 import pickle
 
@@ -19,221 +17,352 @@ def pil_loader(path):
 		img = img.convert('RGB')
 	return img
 
-def loadClassNames(dirpath):
-	testLabels = []
-	labels = set()
-	for subdir, dirs, files in os.walk(dirpath):
-		for filename in files:
-			testLabels.append(subdir.replace(dirpath+'/', ''))
-			labels.add(subdir.replace(dirpath+'/', ''))
 
-	return [labels,testLabels]
+class ShanyNet:
+	def __init__(self, cfg=None):
+		self.config = cfg
 
-class ImageLoader(object):
-	def __init__(self, dirpath, transform=None, loader=pil_loader):
-		self.filepaths_in_dir = []
-		self.transform = transform
-		self.loader = loader
+		if cfg is None:
+			self.config = CFG()
+
+		self.model = None
+		self.predictions = None
+		self.classes = None
+
+	def build(self):
+
+		""" use of 6 conv layers, 1 fully connected """
+		model = Sequential()
+		model.add(Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=(224, 224, 3)))  # 32 filters, size of 3x3
+		model.add(Conv2D(32, (3, 3), activation='relu'))
+		model.add(MaxPooling2D(pool_size=(2, 2)))
+		model.add(Dropout(0.25))
+
+		model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))  # 64 filters, size 3x3
+		model.add(Conv2D(64, (3, 3), activation='relu'))
+		model.add(MaxPooling2D(pool_size=(2, 2)))  # 2x2 max pooling
+		model.add(Dropout(0.25)) # technique used to tackle Overfitting
+
+		model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
+		model.add(Conv2D(64, (3, 3), activation='relu'))
+		model.add(MaxPooling2D(pool_size=(2, 2)))
+		model.add(Dropout(0.25))
+
+		model.add(Flatten())  # flat
+		model.add(Dense(512, activation='relu', name="layer_512"))
+		model.add(Dropout(0.5))
+		model.add(Dense(100, activation='softmax', name="layer_100"))  # 100 classes
+
+		model.summary()
+		self.model = model
+
+		return self
+
+	def create(self):
+		self.model = None
+		self.model = Sequential()
+		return self
+
+	def load_model(self):
+		json_file = open(self.config.get_model_name() + '.json', 'r')
+		model_json = json_file.read()
+		model = model_from_json(model_json)
+		model.load_weights(self.config.get_model_name() + ".h5",by_name=True)
+
+		self.model = model
+
+		return self
+
+	def get_model(self):
+		return self.model
+
+	def load_classes(self, dirpath=''):
+		if dirpath == '':
+			self.classes = []
+			return self
+
+		self.classes = []
 		for subdir, dirs, files in os.walk(dirpath):
 			for filename in files:
-				filepath = path.join(subdir, filename)
-				if not (filename.lower().endswith('.png') or filename.lower().endswith('.jpg')):
-					continue
+				self.classes.append(subdir.replace(dirpath+'/', ''))
 
-				img = pil_loader(filepath)
-				img.convert('RGB')
+		return self
 
-				self.filepaths_in_dir.append([np.array(img), subdir.replace(dirpath+'/', '')])
+	def compile(self):
+		if self.model is None:
+			return self
 
-				print(filename + " loaded...")
+		self.model.compile(optimizer=self.config.get_optimizer(), loss=self.config.get_loss_function(), metrics=self.config.get_compile_metrics())
 
-	def __len__(self):
-		return len(self.filepaths_in_dir)
+		return self
+
+	def train(self):
+		if self.model is None:
+			return self
+
+		if self.config.get_train_val_path() == '':
+			return self
+
+		train_datagen = ImageDataGenerator(rescale=1./255)
+		valid_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
+
+		train_generator = train_datagen.flow_from_directory(
+			self.config.get_train_val_path(),
+			target_size=(224, 224),
+			batch_size=self.config.get_batch_size(),
+			class_mode='binary')
+
+		val_generator = valid_datagen.flow_from_directory(
+			self.config.get_train_val_path(),
+			target_size=(224, 224),
+			batch_size=self.config.get_batch_size(),
+			class_mode='binary')
+
+		# steps for training
+		steps = train_generator.n/train_generator.batch_size
+
+		# store all training information while training the dataset
+		history = History()
+
+		print("Training network...")
+		self.model.fit_generator(
+			train_generator,
+			steps_per_epoch=steps,
+			epochs=self.config.get_num_epochs(),
+			validation_data=val_generator,
+			validation_steps=self.config.get_batch_size(),
+			use_multiprocessing=self.config.get_multithreading_status(),
+			workers=self.config.get_num_threads(),
+			callbacks=[history])
+
+		if self.config.get_should_save_model() is True and self.config.get_model_name() != '':
+			# save model and weights
+			model_json = self.model.to_json()
+			with open(self.config.get_model_name() + ".json", "w") as json_file:
+				json_file.write(model_json)
+
+			print("Model saved to disk.")
+
+		if self.config.get_should_save_weights() is True and self.config.get_model_name() != '':
+			# serialize weights to HDF5
+			self.model.save_weights(self.config.get_model_name() + ".h5")
+			print("Model's weights saved to disk.")
+
+		if self.config.get_should_save_history() is True and self.config.get_model_name() != '':
+			with open(self.config.get_model_name() + ".history", "wb") as f:
+				pickle.dump(history.history, f)
+			print("Model's history saved.")
+
+		# Evaluate model
+		# model.evaluate_generator(generator=val_generator, steps=STEP_SIZE_VALID, use_multiprocessing=True, workers=6)
+
+		return self
+
+	def test(self):
+		if self.model is None:
+			return self
+
+		if self.config.get_test_path() == '':
+			return self
+
+		test_datagen = ImageDataGenerator()
+
+		test_generator = test_datagen.flow_from_directory(
+			directory=self.config.get_test_path(),
+			target_size=(224, 224),
+			color_mode="rgb",
+			batch_size=self.config.get_batch_size(),
+			class_mode=None,
+			shuffle=False
+		)
+
+		steps = test_generator.n/test_generator.batch_size
+
+		print("Testing network...")
+		test_generator.reset()
+		self.predictions = self.model.predict_generator(test_generator, steps=steps, use_multiprocessing=self.config.get_multithreading_status(), workers=self.config.get_num_threads(), verbose=1)
+
+		return self
+
+	def infer(self, image_path=None):
+		if self.model is None:
+			return self
+
+		if self.config.get_test_path() == '':
+			return self
+
+		test_datagen = ImageDataGenerator()
+
+		test_generator = test_datagen.flow_from_directory(
+			directory=image_path,
+			target_size=(224, 224),
+			color_mode="rgb",
+			batch_size=self.config.get_batch_size(),
+			class_mode=None,
+			shuffle=False
+		)
+
+		steps = test_generator.n/test_generator.batch_size
+
+		print("Testing network...")
+		test_generator.reset()
+		predictions = self.model.predict_generator(test_generator, steps=steps, use_multiprocessing=self.config.get_multithreading_status(), workers=self.config.get_num_threads(), verbose=1)
+
+		# print embeddings
+		print(predictions)
+
+		return self
 
 
-def ShanyNet2():
-	""" use of 6 conv layers, 1 fully connected """
-	model = Sequential()
-	model.add(Conv2D(32, (3, 3), padding='same', activation='relu', input_shape=(224, 224, 3)))  # 32 filters, size of 3x3
-	model.add(Conv2D(32, (3, 3), activation='relu'))
-	model.add(MaxPooling2D(pool_size=(2, 2)))
-	model.add(Dropout(0.25))
+	def get_predictions(self):
+		return self.predictions
 
-	model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))  # 64 filters, size 3x3
-	model.add(Conv2D(64, (3, 3), activation='relu'))
-	model.add(MaxPooling2D(pool_size=(2, 2)))  # 2x2 max pooling
-	model.add(Dropout(0.25)) # technique used to tackle Overfitting
+	def get_predictions_indexes(self):
+		return np.argmax(self.predictions, axis=1)
 
-	model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
-	model.add(Conv2D(64, (3, 3), activation='relu'))
-	model.add(MaxPooling2D(pool_size=(2, 2)))
-	model.add(Dropout(0.25))
+class CFG:
+	def __init__(self, batch=10,
+			epochs=100,
+			enable_multithreading=True,
+			threads=10,
+			train_val_path='',
+			test_path='',
+			model_output_path='',
+			model_name='',
+			optimizer='sgd',
+			loss_function='sparse_categorical_crossentropy',
+			compile_metrics=['metrics'],
+			save_model=False,
+			save_weights=False,
+			save_history=False):
+		self.batch = batch
+		self.epochs = epochs
+		self.enable_multithreading = enable_multithreading
+		self.threads = threads
+		self.train_val_path = train_val_path
+		self.test_path = test_path
+		self.model_output_path = model_output_path
+		self.model_name = model_name
+		self.optimizer = optimizer
+		self.loss_function = loss_function
+		self.compile_metrics = compile_metrics
+		self.save_model = save_model
+		self.save_weights = save_weights
+		self.save_history = save_history
 
-	model.add(Flatten())  # flat
-	model.add(Dense(512, activation='relu', name="layer_1"))
-	model.add(Dropout(0.5))
-	model.add(Dense(100, activation='softmax', name="layer_2"))  # 100 classes
+	def set_optimizer(self, optimizer=None):
+		if optimizer is None:
+			return self
 
-	model.summary()
-	return model
+		self.optimizer = optimizer
 
+		return self
 
-def train_val_test(model=None, train_val_path='', batch=16, epochs=100):
-	if model is None:
-		return
+	def get_model_name(self):
+		return self.model_name
 
-	if train_val_path == '':
-		return
+	def get_model_output_path(self):
+		if self.model_output_path[-1] == '/':
+			return self.model_output_path + self.model_name
 
-	enable_multithreading = True
-	threads = 5
+		return self.model_output_path + '/' + self.model_name
 
-	train_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
-	valid_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
+	def get_should_save_history(self):
+		return self.save_history
 
-	train_generator = train_datagen.flow_from_directory(
-		train_val_path,
-		target_size=(224, 224),
-		batch_size=batch,
-		class_mode='binary')
+	def get_should_save_weights(self):
+		return self.save_weights
 
-	val_generator = valid_datagen.flow_from_directory(
-		train_val_path,
-		target_size=(224, 224),
-		batch_size=batch,
-		class_mode='binary')
+	def get_should_save_model(self):
+		return self.save_model
 
+	def get_train_val_path(self):
+		return self.train_val_path
 
+	def get_test_path(self):
+		return self.test_path
 
-	# calculate best steps for training
-	STEP_SIZE_TRAIN=train_generator.n/train_generator.batch_size
-	STEP_SIZE_VALID=val_generator.n/val_generator.batch_size
+	def get_num_epochs(self):
+		return self.epochs
 
-	# store all training information while training the dataset
-	history = History()
+	def get_batch_size(self):
+		return self.batch
 
-	print("Training network...")
-	model.fit_generator(
-		train_generator,
-		steps_per_epoch=STEP_SIZE_TRAIN,
-		epochs=epochs,
-		validation_data=val_generator,
-		validation_steps=batch,
-		use_multiprocessing=enable_multithreading,
-		workers=threads,
-		callbacks=[history])
+	def get_num_threads(self):
+		return self.threads
 
-	# save model and weights
-	model_json = model.to_json()
-	with open("shanynet2.json", "w") as json_file:
-		json_file.write(model_json)
-	# serialize weights to HDF5
-	model.save_weights("shanynet2.h5")
-	print("Model saved to disk.")
+	def get_multithreading_status(self):
+		return self.enable_multithreading
 
-	print(history.history)
-	print("Saving history...")
-	with open("shanynet2.history", "wb") as f:
-		pickle.dump(history.history, f)
+	def get_optimizer(self):
+		return self.optimizer
 
-	# model.evaluate_generator(generator=val_generator, steps=STEP_SIZE_VALID, use_multiprocessing=True, workers=6)
+	def get_loss_function(self):
+		return self.loss_function
 
-
-
-def test_model(model=None, test_path=''):
-	if model is None:
-		return
-
-	if test_path == '':
-		return
-
-	enable_multithreading = True
-	threads = 5
-
-	test_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
-
-	test_generator = test_datagen.flow_from_directory(
-		directory=test_path,
-		target_size=(224, 224),
-		color_mode="rgb",
-		batch_size=batch,
-		class_mode=None,
-		shuffle=False
-	)
-
-	STEP_SIZE_TEST = test_generator.n/test_generator.batch_size
-
-	print("Testing network...")
-	test_generator.reset()
-	prediction=model.predict_generator(test_generator, steps=STEP_SIZE_TEST, use_multiprocessing=enable_multithreading, workers=threads, verbose=1)
-	predIdxs=np.argmax(prediction,axis=1)
-
-	print(prediction)
-
-	return predIdxs
-
-def load_model():
-	json_file = open('shanynet2.json', 'r')
-	model_json = json_file.read()
-	model = model_from_json(model_json)
-	model.load_weights("shanynet2.h5")
-	model._make_predict_function()
-
-	return model
-
-def plotModelInformation(model = None):
-	if model is None:
-		return
-
-	print(history.history.keys())
-	# summarize history for accuracy
-	plt.plot(history.history['acc'])
-	plt.plot(history.history['val_acc'])
-	plt.title('model accuracy')
-	plt.ylabel('accuracy')
-	plt.xlabel('epoch')
-	plt.legend(['train', 'test'], loc='upper left')
-	plt.show()
-	# summarize history for loss
-	plt.plot(history.history['loss'])
-	plt.plot(history.history['val_loss'])
-	plt.title('model loss')
-	plt.ylabel('loss')
-	plt.xlabel('epoch')
-	plt.legend(['train', 'test'], loc='upper left')
-	plt.show()
+	def get_compile_metrics(self):
+		return self.compile_metrics
 
 
 def main():
-	train_val_data_path = '/ib/junk/junk/shany_ds/shany_proj/dataset/train'
-	test_data_path = '/ib/junk/junk/shany_ds/shany_proj/dataset/test'
-	save_model_path = '/ib/junk/junk/shany_ds/shany_proj/model/model2.h5'
+	# Activations
+	# ============
+	# 'softmax'
+	# 'relu'
+	# 'sigmoid'
+	# 'elu'
+	# 'selu'
+	# 'softplus'
+	# 'softsign'
+	# 'tanh'
+	# 'hard_sigmoid'
+	# 'exponential'
+	# 'linear'
 
-	data = loadClassNames(train_val_data_path)
-	lb = LabelBinarizer()
-	lb.fit(list(data[0]))
-	classes = lb.transform(data[1])
-	# from tensorflow.python.client import device_lib
-	# print(device_lib.list_local_devices())
+	# Optimizers:
+	# =============
+	# 'RMSprop'
+	# 'Adagrad'
+	# 'Adadelta'
+	# 'Adam'
+	# 'Adamax'
+	# 'Nadam'
+	# 'SGD' / optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+	# 'adam' / optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
 
-	#load model
-	#model = load_model()
-	#return
+	# Loss Functions
+	# ==============
+	# 'mean_squared_error'
+	# 'mean_absolute_error'
+	# 'mean_absolute_percentage_error'
+	# 'mean_squared_logarithmic_error'
+	# 'squared_hinge'
+	# 'hinge'
+	# 'categorical_hinge'
+	# 'logcosh'
+	# 'categorical_crossentropy'
+	# 'sparse_categorical_crossentropy'
+	# 'binary_crossentropy'
+	# 'kullback_leibler_divergence'
+	# 'poisson'
+	# 'cosine_proximity'
 
-	# conf
-	batch = 16
-	epochs = 10  # number of epochs
+	cfg = CFG(batch=16,
+			epochs=7,
+			threads=5,
+			train_val_path='/ib/junk/junk/shany_ds/shany_proj/dataset/train/',
+			test_path='/ib/junk/junk/shany_ds/shany_proj/dataset/test/',
+			model_output_path='/ib/junk/junk/shany_ds/shany_proj/model/',
+			model_name='shanynet2',
+			optimizer='rmsprop',
+			loss_function='sparse_categorical_crossentropy',
+			compile_metrics=['accuracy'],
+			save_model=True,
+			save_weights=True,
+			save_history=True)
 
-
-
-	# train from new model
-	model = ShanyNet2()
-	# opt = 'rmsprop'
-	# opt = 'sgd'
-	# opt = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-	opt = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-	model.compile(optimizer=opt, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-
-	train_val_test(model=model, train_val_path=train_val_data_path, test_path=test_data_path, batch=batch, epochs=epochs)
+	Net = ShanyNet(cfg=cfg)
+	#Net.build().compile().train().test()
+	Net.load_model().infer('/ib/junk/junk/shany_ds/shany_proj/test_image')
 
 main()
