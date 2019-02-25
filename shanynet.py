@@ -29,7 +29,7 @@ class ShanyNet:
 		self.predictions = None
 		self.classes = None
 
-	def build(self):
+	def simple(self):
 
 		""" use of 6 conv layers, 1 fully connected """
 		model = Sequential()
@@ -63,6 +63,34 @@ class ShanyNet:
 		self.model = Sequential()
 		return self
 
+	def add_2d(self, filters=32, kernel=(3,3), **kwargs):
+		self.model.add(Conv2D(filters, kernel, **kwargs))  # 32 filters, size of 3x3
+		return self
+
+	def add_max_pooling(self, size=(2, 2)):
+		self.model.add(MaxPooling2D(pool_size=size))  # 2x2 max pooling
+		return self
+
+	def add_dropout(self, dropout=0.25):
+		self.model.add(Dropout(dropout))
+		return self
+
+	def add_flatten(self):
+		self.model.add(Flatten())
+		return self
+
+	def add_dense(self, size=512, **kwargs):
+		self.model.add(Dense(size, **kwargs))
+		return self
+
+	def add_basic_block(self):
+		self.add_2d(filters=64, kernel=(3, 3), padding='same', activation='relu') \
+			.add_2d(filters=64, kernel=(3, 3), activation='relu') \
+			.add_max_pooling() \
+			.add_dropout()
+
+		return self
+
 	def load_model(self):
 		json_file = open(self.config.get_model_name() + '.json', 'r')
 		model_json = json_file.read()
@@ -71,6 +99,10 @@ class ShanyNet:
 
 		self.model = model
 
+		return self
+
+	def show_model_summary(self):
+		self.model.summary()
 		return self
 
 	def get_model(self):
@@ -135,23 +167,24 @@ class ShanyNet:
 			workers=self.config.get_num_threads(),
 			callbacks=[history])
 
-		if self.config.get_should_save_model() is True and self.config.get_model_name() != '':
-			# save model and weights
-			model_json = self.model.to_json()
-			with open(self.config.get_model_name() + ".json", "w") as json_file:
-				json_file.write(model_json)
+		if self.config.enable_saving is True:
+			if self.config.get_should_save_model() is True and self.config.get_model_name() != '':
+				# save model and weights
+				model_json = self.model.to_json()
+				with open(self.config.get_model_name() + ".json", "w") as json_file:
+					json_file.write(model_json)
 
-			print("Model saved to disk.")
+				print("Model saved to disk.")
 
-		if self.config.get_should_save_weights() is True and self.config.get_model_name() != '':
-			# serialize weights to HDF5
-			self.model.save_weights(self.config.get_model_name() + ".h5")
-			print("Model's weights saved to disk.")
+			if self.config.get_should_save_weights() is True and self.config.get_model_name() != '':
+				# serialize weights to HDF5
+				self.model.save_weights(self.config.get_model_name() + ".h5")
+				print("Model's weights saved to disk.")
 
-		if self.config.get_should_save_history() is True and self.config.get_model_name() != '':
-			with open(self.config.get_model_name() + ".history", "wb") as f:
-				pickle.dump(history.history, f)
-			print("Model's history saved.")
+			if self.config.get_should_save_history() is True and self.config.get_model_name() != '':
+				with open(self.config.get_model_name() + ".history", "wb") as f:
+					pickle.dump(history.history, f)
+				print("Model's history saved.")
 
 		# Evaluate model
 		# model.evaluate_generator(generator=val_generator, steps=STEP_SIZE_VALID, use_multiprocessing=True, workers=6)
@@ -232,6 +265,7 @@ class CFG:
 			optimizer='sgd',
 			loss_function='sparse_categorical_crossentropy',
 			compile_metrics=['metrics'],
+			enable_saving = False,
 			save_model=False,
 			save_weights=False,
 			save_history=False):
@@ -249,6 +283,7 @@ class CFG:
 		self.save_model = save_model
 		self.save_weights = save_weights
 		self.save_history = save_history
+		self.enable_saving = enable_saving
 
 	def set_optimizer(self, optimizer=None):
 		if optimizer is None:
@@ -348,21 +383,44 @@ def main():
 	# 'cosine_proximity'
 
 	cfg = CFG(batch=16,
-			epochs=7,
+			epochs=10,
+			enable_multithreading=True,
 			threads=5,
 			train_val_path='/ib/junk/junk/shany_ds/shany_proj/dataset/train/',
 			test_path='/ib/junk/junk/shany_ds/shany_proj/dataset/test/',
 			model_output_path='/ib/junk/junk/shany_ds/shany_proj/model/',
-			model_name='shanynet2',
+			model_name='shanynet3',
 			optimizer='rmsprop',
 			loss_function='sparse_categorical_crossentropy',
 			compile_metrics=['accuracy'],
+			enable_saving=True,
 			save_model=True,
 			save_weights=True,
 			save_history=True)
 
 	Net = ShanyNet(cfg=cfg)
-	#Net.build().compile().train().test()
-	Net.load_model().infer('/ib/junk/junk/shany_ds/shany_proj/test_image')
+	Net.create()\
+		.add_2d(filters=32, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3))\
+		.add_2d(filters=32, kernel=(3, 3), activation='relu')\
+		.add_max_pooling()\
+		.add_dropout()\
+		.add_basic_block()\
+		.add_basic_block()\
+		.add_flatten()\
+		.add_dense(size=512, activation='relu', name="layer_512")\
+		.add_dense(size=100, activation='softmax', name="layer_100")\
+		.show_model_summary()\
+		.compile()\
+		.train()\
+		.test()
+
+	# model.add(Flatten())  # flat
+	# model.add(Dense(512, activation='relu', name="layer_512"))
+	# model.add(Dropout(0.5))
+	# model.add(Dense(100, activation='softmax', name="layer_100"))  # 100 classes
+
+
+	#Net.simple().compile().train().test()  # create simple network
+	#Net.load_model().infer('/ib/junk/junk/shany_ds/shany_proj/test_image')  # load model
 
 main()
