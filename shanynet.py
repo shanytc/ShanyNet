@@ -29,6 +29,7 @@ class ShanyNet:
 		self.model = None
 		self.predictions = None
 		self.classes = None
+		self.history = None
 
 	def simple(self):
 
@@ -123,6 +124,10 @@ class ShanyNet:
 
 		self.model = model
 
+		# load history
+		with open(self.config.get_model_name() + '.history', 'rb') as f:
+			self.history = pickle.load(f)
+
 		return self
 
 	def show_model_summary(self):
@@ -160,7 +165,7 @@ class ShanyNet:
 			return self
 
 		train_datagen = ImageDataGenerator(rescale=1./255)
-		#valid_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
+		valid_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
 
 		train_generator = train_datagen.flow_from_directory(
 			self.config.get_train_val_path(),
@@ -168,17 +173,17 @@ class ShanyNet:
 			batch_size=self.config.get_batch_size(),
 			class_mode='binary')
 
-		#val_generator = valid_datagen.flow_from_directory(
-		#	self.config.get_train_val_path(),
-		#	target_size=(224, 224),
-		#	batch_size=self.config.get_batch_size(),
-		#	class_mode='binary')
+		val_generator = valid_datagen.flow_from_directory(
+			self.config.get_train_val_path(),
+			target_size=(224, 224),
+			batch_size=self.config.get_batch_size(),
+			class_mode='binary')
 
 		# steps for training
 		steps = train_generator.n/train_generator.batch_size
 
 		# store all training information while training the dataset
-		history = History()
+		self.history = History()
 
 		print("Training network...")
 		self.model.fit_generator(
@@ -187,7 +192,7 @@ class ShanyNet:
 			epochs=self.config.get_num_epochs(),
 			use_multiprocessing=self.config.get_multithreading_status(),
 			workers=self.config.get_num_threads(),
-			callbacks=[history])
+			callbacks=[self.history])
 
 		if self.config.enable_saving is True:
 			if self.config.get_should_save_model() is True and self.config.get_model_name() != '':
@@ -205,7 +210,7 @@ class ShanyNet:
 
 			if self.config.get_should_save_history() is True and self.config.get_model_name() != '':
 				with open(self.config.get_model_name() + ".history", "wb") as f:
-					pickle.dump(history.history, f)
+					pickle.dump(self.history.history, f)
 				print("Model's history saved.")
 
 		# Evaluate model
@@ -270,14 +275,14 @@ class ShanyNet:
 		steps = infer_generator.n/infer_generator.batch_size
 
 		print("Infering folder(s)...")
-		#infer_generator.reset()
+		infer_generator.reset()
 		embeddings = self.model.predict_generator(infer_generator, steps=steps, use_multiprocessing=self.config.get_multithreading_status(), workers=self.config.get_num_threads(), verbose=1)
 
 		# get classes
 		if self.config.load_model_embeddings is False:
 			predicted_class_indices=np.argmax(embeddings, axis=1)  # get index of classes
 			labels = (train_generator.class_indices)
-			labels = dict((v,k) for k,v in labels.items())
+			labels = dict((v, k) for k,v in labels.items())
 			pred_classes = [labels[k] for k in predicted_class_indices]
 
 			# get embeddings
@@ -287,6 +292,33 @@ class ShanyNet:
 
 		return data
 
+	def plot_history(self):
+		if self.history is None:
+			return self
+
+		plt.plot(self.history['acc'])
+		plt.plot(self.history['val_acc'])
+		plt.title('model accuracy')
+		plt.ylabel('accuracy')
+		plt.xlabel('epoch')
+		plt.legend(['train', 'test'], loc='upper left')
+		plt.show()
+		plt.savefig(self.config.get_model_name() + ".accuracy.png")
+
+		# summarize history for loss
+		plt.plot(self.history['loss'])
+		plt.plot(self.history['val_loss'])
+		plt.title('model loss')
+		plt.ylabel('loss')
+		plt.xlabel('epoch')
+		plt.legend(['train', 'test'], loc='upper left')
+		plt.savefig(self.config.get_model_name() + ".loss.png")
+		plt.show()
+
+		return self
+
+	def get_history(self):
+		return self.history
 
 	def get_predictions(self):
 		return self.predictions
@@ -469,6 +501,7 @@ def main():
 	#	.test()
 
 	cfg.threads = 1
-	Net.load_model().infer()  # load model
+	res = Net.load_model().plot_history()#.infer()  # load model
+	print(res)
 
 main()
