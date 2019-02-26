@@ -101,10 +101,10 @@ class ShanyNet:
 			config = json_file['config']
 			layers = config['layers']
 			for layer in layers:
-				if layer['class_name'] == 'Dropout':
+				if layer['class_name'] == 'Dropout':  # remove dropout (better embeddings)
 					del layer['config']
 					del layer['class_name']
-				elif layer['class_name'] == 'Dense':
+				elif layer['class_name'] == 'Dense': # remove dense layer (100 classes) keep 512 embeddings only
 					layer_config = layer['config']
 					name = layer_config['name']
 					if name == 'layer_100':
