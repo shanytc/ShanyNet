@@ -8,6 +8,7 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import History
 import matplotlib.pyplot as plt
 import pickle
+import json
 
 def pil_loader(path):
 	# open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
@@ -41,7 +42,7 @@ class ShanyNet:
 		model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))  # 64 filters, size 3x3
 		model.add(Conv2D(64, (3, 3), activation='relu'))
 		model.add(MaxPooling2D(pool_size=(2, 2)))  # 2x2 max pooling
-		model.add(Dropout(0.25)) # technique used to tackle Overfitting
+		model.add(Dropout(0.25))  # technique used to tackle Overfitting
 
 		model.add(Conv2D(64, (3, 3), padding='same', activation='relu'))
 		model.add(Conv2D(64, (3, 3), activation='relu'))
@@ -83,19 +84,42 @@ class ShanyNet:
 		self.model.add(Dense(size, **kwargs))
 		return self
 
-	def add_basic_block(self):
-		self.add_2d(filters=64, kernel=(3, 3), padding='same', activation='relu') \
-			.add_2d(filters=64, kernel=(3, 3), activation='relu') \
+	def add_basic_block(self, filters=64, kernel=(3, 3), activation='relu'):
+		self.add_2d(filters=filters, kernel=kernel, padding='same', activation=activation) \
+			.add_2d(filters=filters, kernel=kernel, activation=activation) \
 			.add_max_pooling() \
 			.add_dropout()
 
 		return self
 
 	def load_model(self):
-		json_file = open(self.config.get_model_name() + '.json', 'r')
-		model_json = json_file.read()
+		# prepare json for embeddings only
+		if self.config.load_model_embeddings is True:
+			with open(self.config.get_model_name() + '.json', 'r') as f:
+				json_file = json.load(f)
+
+			config = json_file['config']
+			layers = config['layers']
+			for layer in layers:
+				if layer['class_name'] == 'Dropout':
+					del layer['config']
+					del layer['class_name']
+				elif layer['class_name'] == 'Dense':
+					layer_config = layer['config']
+					name = layer_config['name']
+					if name == 'layer_100':
+						del layer['config']
+						del layer['class_name']
+			while {} in layers:
+				layers.remove({})
+
+			model_json = json.dumps(json_file)
+		else:
+			json_file = open(self.config.get_model_name() + '.json', 'r')
+			model_json = json_file.read()
+
 		model = model_from_json(model_json)
-		model.load_weights(self.config.get_model_name() + ".h5",by_name=True)
+		model.load_weights(self.config.get_model_name() + ".h5", by_name=True)
 
 		self.model = model
 
@@ -136,7 +160,7 @@ class ShanyNet:
 			return self
 
 		train_datagen = ImageDataGenerator(rescale=1./255)
-		valid_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
+		#valid_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
 
 		train_generator = train_datagen.flow_from_directory(
 			self.config.get_train_val_path(),
@@ -144,11 +168,11 @@ class ShanyNet:
 			batch_size=self.config.get_batch_size(),
 			class_mode='binary')
 
-		val_generator = valid_datagen.flow_from_directory(
-			self.config.get_train_val_path(),
-			target_size=(224, 224),
-			batch_size=self.config.get_batch_size(),
-			class_mode='binary')
+		#val_generator = valid_datagen.flow_from_directory(
+		#	self.config.get_train_val_path(),
+		#	target_size=(224, 224),
+		#	batch_size=self.config.get_batch_size(),
+		#	class_mode='binary')
 
 		# steps for training
 		steps = train_generator.n/train_generator.batch_size
@@ -161,8 +185,6 @@ class ShanyNet:
 			train_generator,
 			steps_per_epoch=steps,
 			epochs=self.config.get_num_epochs(),
-			validation_data=val_generator,
-			validation_steps=self.config.get_batch_size(),
 			use_multiprocessing=self.config.get_multithreading_status(),
 			workers=self.config.get_num_threads(),
 			callbacks=[history])
@@ -198,7 +220,7 @@ class ShanyNet:
 		if self.config.get_test_path() == '':
 			return self
 
-		test_datagen = ImageDataGenerator()
+		test_datagen = ImageDataGenerator(rescale=1./255)
 
 		test_generator = test_datagen.flow_from_directory(
 			directory=self.config.get_test_path(),
@@ -221,13 +243,22 @@ class ShanyNet:
 		if self.model is None:
 			return self
 
-		if self.config.get_test_path() == '':
-			return self
+		if image_path is not None and image_path != '':
+			self.config.infer_path = image_path
+		else:
+			if self.config.get_infer_path() == '':
+				return self
 
-		test_datagen = ImageDataGenerator()
+		train_datagen = ImageDataGenerator(rescale=1./255)
+		train_generator = train_datagen.flow_from_directory(
+			self.config.get_train_val_path(),
+			target_size=(224, 224),
+			batch_size=self.config.get_batch_size(),
+			class_mode='binary')
 
-		test_generator = test_datagen.flow_from_directory(
-			directory=image_path,
+		infer_datagen = ImageDataGenerator(rescale=1./255)
+		infer_generator = infer_datagen.flow_from_directory(
+			directory=self.config.get_infer_path(),
 			target_size=(224, 224),
 			color_mode="rgb",
 			batch_size=self.config.get_batch_size(),
@@ -235,16 +266,26 @@ class ShanyNet:
 			shuffle=False
 		)
 
-		steps = test_generator.n/test_generator.batch_size
+		filenames = infer_generator.filenames
+		steps = infer_generator.n/infer_generator.batch_size
 
-		print("Testing network...")
-		test_generator.reset()
-		predictions = self.model.predict_generator(test_generator, steps=steps, use_multiprocessing=self.config.get_multithreading_status(), workers=self.config.get_num_threads(), verbose=1)
+		print("Infering folder(s)...")
+		#infer_generator.reset()
+		embeddings = self.model.predict_generator(infer_generator, steps=steps, use_multiprocessing=self.config.get_multithreading_status(), workers=self.config.get_num_threads(), verbose=1)
 
-		# print embeddings
-		print(predictions)
+		# get classes
+		if self.config.load_model_embeddings is False:
+			predicted_class_indices=np.argmax(embeddings, axis=1)  # get index of classes
+			labels = (train_generator.class_indices)
+			labels = dict((v,k) for k,v in labels.items())
+			pred_classes = [labels[k] for k in predicted_class_indices]
 
-		return self
+			# get embeddings
+			data = list(zip(filenames, embeddings, pred_classes))
+		else:
+			data = list(zip(filenames, embeddings))
+
+		return data
 
 
 	def get_predictions(self):
@@ -260,6 +301,7 @@ class CFG:
 			threads=10,
 			train_val_path='',
 			test_path='',
+			infer_path='',
 			model_output_path='',
 			model_name='',
 			optimizer='sgd',
@@ -268,13 +310,15 @@ class CFG:
 			enable_saving = False,
 			save_model=False,
 			save_weights=False,
-			save_history=False):
+			save_history=False,
+			load_model_embeddings = False):
 		self.batch = batch
 		self.epochs = epochs
 		self.enable_multithreading = enable_multithreading
 		self.threads = threads
 		self.train_val_path = train_val_path
 		self.test_path = test_path
+		self.infer_path = infer_path
 		self.model_output_path = model_output_path
 		self.model_name = model_name
 		self.optimizer = optimizer
@@ -284,6 +328,7 @@ class CFG:
 		self.save_weights = save_weights
 		self.save_history = save_history
 		self.enable_saving = enable_saving
+		self.load_model_embeddings = load_model_embeddings
 
 	def set_optimizer(self, optimizer=None):
 		if optimizer is None:
@@ -316,6 +361,9 @@ class CFG:
 
 	def get_test_path(self):
 		return self.test_path
+
+	def get_infer_path(self):
+		return self.infer_path
 
 	def get_num_epochs(self):
 		return self.epochs
@@ -388,8 +436,10 @@ def main():
 			threads=5,
 			train_val_path='/ib/junk/junk/shany_ds/shany_proj/dataset/train/',
 			test_path='/ib/junk/junk/shany_ds/shany_proj/dataset/test/',
+			infer_path='/ib/junk/junk/shany_ds/shany_proj/dataset/inference/',
 			model_output_path='/ib/junk/junk/shany_ds/shany_proj/model/',
 			model_name='shanynet3',
+			load_model_embeddings=False,
 			optimizer='rmsprop',
 			loss_function='sparse_categorical_crossentropy',
 			compile_metrics=['accuracy'],
@@ -398,29 +448,27 @@ def main():
 			save_weights=True,
 			save_history=True)
 
+	# Create simple CNN network
+	# Net.simple().compile().train().test()
+
+	# create a custom CNN net
 	Net = ShanyNet(cfg=cfg)
-	Net.create()\
-		.add_2d(filters=32, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3))\
-		.add_2d(filters=32, kernel=(3, 3), activation='relu')\
-		.add_max_pooling()\
-		.add_dropout()\
-		.add_basic_block()\
-		.add_basic_block()\
-		.add_flatten()\
-		.add_dense(size=512, activation='relu', name="layer_512")\
-		.add_dense(size=100, activation='softmax', name="layer_100")\
-		.show_model_summary()\
-		.compile()\
-		.train()\
-		.test()
+	#Net.create()\
+	#	.add_2d(filters=32, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3))\
+	#	.add_2d(filters=32, kernel=(3, 3), activation='relu')\
+	#	.add_max_pooling()\
+	#	.add_dropout()\
+	#	.add_basic_block()\
+	#	.add_basic_block()\
+	#	.add_flatten()\
+	#	.add_dense(size=512, activation='relu', name="layer_512")\
+	#	.add_dense(size=100, activation='softmax', name="layer_100")\
+	#	.show_model_summary()\
+	#	.compile()\
+	#	.train()\
+	#	.test()
 
-	# model.add(Flatten())  # flat
-	# model.add(Dense(512, activation='relu', name="layer_512"))
-	# model.add(Dropout(0.5))
-	# model.add(Dense(100, activation='softmax', name="layer_100"))  # 100 classes
-
-
-	#Net.simple().compile().train().test()  # create simple network
-	#Net.load_model().infer('/ib/junk/junk/shany_ds/shany_proj/test_image')  # load model
+	cfg.threads = 1
+	Net.load_model().infer()  # load model
 
 main()
