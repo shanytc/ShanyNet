@@ -7,6 +7,7 @@ from keras.layers import Dense, Conv2D, MaxPooling2D, Dropout, Flatten
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import History
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import pickle
 import json
 
@@ -318,23 +319,46 @@ class ShanyNet:
 		if self.history is None:
 			return self
 
+		print("Ploting history to images...")
+
+		# summarize history for accuracy
+		fig, ax = plt.subplots()
+		ax.grid(True)
+		ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+		ax.set_xlim(0, len(self.history['acc']))
+		list = []
+		for i in range(0, len(self.history['acc'])):
+			list.append(i+1)
+		ax.set_xticklabels(list)
+
 		plt.plot(self.history['acc'])
 		plt.plot(self.history['val_acc'])
 		plt.title('model accuracy')
 		plt.ylabel('accuracy')
 		plt.xlabel('epoch')
-		plt.legend(['train', 'test'], loc='upper left')
+		plt.legend(['train (acc)', 'test (val_acc)'], loc='upper left')
 		plt.show()
-		plt.savefig(self.config.get_model_name() + ".accuracy.png")
+		plt.savefig(self.config.get_model_output_path() + self.config.get_model_name() + ".accuracy.png")
+		plt.clf()
 
 		# summarize history for loss
+		fig, ax = plt.subplots()
+		ax.grid(True)
+		ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+		ax.set_xlim(0, len(self.history['loss']))
+		list = []
+		for i in range(0, len(self.history['loss'])):
+			list.append(i+1)
+		ax.set_xticklabels(list)
+
+		ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 		plt.plot(self.history['loss'])
 		plt.plot(self.history['val_loss'])
 		plt.title('model loss')
 		plt.ylabel('loss')
 		plt.xlabel('epoch')
-		plt.legend(['train', 'test'], loc='upper left')
-		plt.savefig(self.config.get_model_name() + ".loss.png")
+		plt.legend(['train (loss)', 'test (val_loss)'], loc='upper left')
+		plt.savefig(self.config.get_model_output_path() + self.config.get_model_name() + ".loss.png")
 		plt.show()
 
 		return self
@@ -501,19 +525,19 @@ def main():
 	# sparse
 
 	cfg = CFG(batch=16,
-			epochs=15,
-			enable_multithreading=True,
-			threads=5,
+			epochs=5,
 			classes=4,
+			enable_multithreading=True,
+			threads=4,
 			class_mode='sparse',
-			train_path='/ib/junk/junk/shany_ds/shany_proj/final_project_dataset/train/',
-			validation_path='/ib/junk/junk/shany_ds/shany_proj/final_project_dataset/validation/',
-			infer_path='/ib/junk/junk/shany_ds/shany_proj/final_project_dataset/inference/',
-			model_output_path='/ib/junk/junk/shany_ds/shany_proj/final_project_dataset/model/',
-			model_name='finalproject',
-			load_model_embeddings=False,  # strip dropouts and fc layers
 			optimizer='rmsprop',
 			loss_function='sparse_categorical_crossentropy',
+			train_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/train/',
+			validation_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/validation/',
+			infer_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/inference/',
+			model_output_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/model/',
+			model_name='finalproject',
+			load_model_embeddings=False,  # strip dropouts and fc layers
 			compile_metrics=['accuracy'],
 			enable_saving=True,
 			save_model=True,
@@ -543,8 +567,7 @@ def main():
 	# 	.evaluate()
 
 	cfg.threads = 1
-	res = Net.load_model().plot_history()
-	res = Net.load_model().infer()
+	res = Net.load_model().plot_history()#.infer()
 	print(res)
 
 main()
