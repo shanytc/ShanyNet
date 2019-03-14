@@ -28,7 +28,7 @@ def remove_folder(folder = None):
 	if folder is None:
 		return
 
-	os.rmdir(folder)
+	shutil.rmtree(folder)
 
 def create_folder(folder = None):
 	if folder is None:
@@ -37,7 +37,7 @@ def create_folder(folder = None):
 	if not os.path.exists(folder):
 		os.makedirs(folder)
 
-def gen_data(folder_path=None, output = None, percent = 0.2):
+def gen_data(folder_path=None, output = None, percent = 0.8):
 	folders = [f for f in listdir(folder_path) if not isfile(join(folder_path, f))]
 
 	for folder in folders:
@@ -56,20 +56,25 @@ def gen_data(folder_path=None, output = None, percent = 0.2):
 			shutil.move(src, dest)
 
 def generate():
-	gen_data(_FOLDER_DATASET_,_FOLDER_TRAIN_, 0.2)  # generate train data from dataset source
-	gen_data(_FOLDER_DATASET_,_FOLDER_INFERENCE_, 1)  # generate inference data from dataset source
-	gen_data(_FOLDER_TRAIN_,_FOLDER_VALIDATON_, 0.2)  # generate validation data from train source
+	create_folder(_FOLDER_TRAIN_)
+	create_folder(_FOLDER_INFERENCE_)
+	create_folder(_FOLDER_VALIDATON_)
+	create_folder(_FOLDER_MODEL_)
+	gen_data(_FOLDER_DATASET_, _FOLDER_TRAIN_, 0.8)  # generate train data from dataset source
+	gen_data(_FOLDER_DATASET_, _FOLDER_INFERENCE_, 1)  # generate inference data from dataset source
+	gen_data(_FOLDER_TRAIN_, _FOLDER_VALIDATON_, 0.2)  # generate validation data from train source
 
 def clear_data():
-	remove_folder(_FOLDER_MODEL_)
 	remove_folder(_FOLDER_DATASET_)
 
 def create_zip():
 	create_folder(_FOLDER_ZIP_)
-	print("Creating project zip file ...")
+	print("Creating project zip file ...", end=" ", flush=True)
 	shutil.make_archive(_ZIP_OUTPUT_, 'zip', _FOLDER_PROJECT_)
+	shutil.move(_FOLDER_ZIP_, _FOLDER_PROJECT_)
+	print("Done.")
 
 if __name__ == '__main__':
-	#  generate()
-	#  lear_data()
-	create_zip()
+	# generate()
+	# clear_data()
+	# create_zip()

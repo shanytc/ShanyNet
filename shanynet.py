@@ -6,6 +6,7 @@ from keras.models import Sequential, model_from_json
 from keras.layers import Dense, Conv2D, MaxPooling2D, Dropout, Flatten
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import History
+from keras.optimizers import Adam, RMSprop, SGD
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import pickle
@@ -32,6 +33,38 @@ class ShanyNet:
 		self.classes = None
 		self.history = None
 
+	def vgg16(self):
+		self.create() \
+			.add_2d(filters=64, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3))\
+			.add_2d(filters=64, kernel=(3, 3), activation='relu')\
+			.add_max_pooling(strides=(2,2))\
+			.add_dropout() \
+			.add_2d(filters=128, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3)) \
+			.add_2d(filters=128, kernel=(3, 3), activation='relu') \
+			.add_max_pooling(strides=(2,2)) \
+			.add_dropout() \
+			.add_2d(filters=256, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3)) \
+			.add_2d(filters=256, kernel=(3, 3), activation='relu') \
+			.add_2d(filters=256, kernel=(3, 3), activation='relu') \
+			.add_max_pooling(strides=(2,2)) \
+			.add_dropout() \
+			.add_2d(filters=512, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3)) \
+			.add_2d(filters=512, kernel=(3, 3), activation='relu') \
+			.add_2d(filters=512, kernel=(3, 3), activation='relu') \
+			.add_max_pooling(strides=(2,2)) \
+			.add_dropout() \
+			.add_2d(filters=512, kernel=(3, 3), activation="relu", padding='same', input_shape=(224, 224, 3)) \
+			.add_2d(filters=512, kernel=(3, 3), activation='relu') \
+			.add_2d(filters=512, kernel=(3, 3), activation='relu') \
+			.add_flatten()\
+			.add_dense(size=4096, activation='relu', name="layer_features1") \
+			.add_dropout() \
+			.add_dense(size=4096, activation='relu', name="layer_features2") \
+			.add_dropout() \
+			.add_dense(size=self.config.get_num_classes(), activation='softmax', name="layer_fc")\
+			.show_model_summary()
+		return self
+
 	def simple(self):
 
 		""" use of 6 conv layers, 1 fully connected """
@@ -54,7 +87,7 @@ class ShanyNet:
 		model.add(Flatten())  # flat
 		model.add(Dense(512, activation='relu', name="layer_features"))
 		model.add(Dropout(0.5))
-		model.add(Dense(100, activation='softmax', name="layer_fc"))  # 100 classes
+		model.add(Dense(size=self.config.get_num_classes(), activation='softmax', name="layer_fc"))  # 100 classes
 
 		model.summary()
 		self.model = model
@@ -67,11 +100,12 @@ class ShanyNet:
 		return self
 
 	def add_2d(self, filters=32, kernel=(3,3), **kwargs):
+		# stride (1,1)
 		self.model.add(Conv2D(filters, kernel, **kwargs))  # 32 filters, size of 3x3
 		return self
 
-	def add_max_pooling(self, size=(2, 2)):
-		self.model.add(MaxPooling2D(pool_size=size))  # 2x2 max pooling
+	def add_max_pooling(self, size=(2, 2), strides=None):
+		self.model.add(MaxPooling2D(pool_size=size, strides=strides))  # 2x2 max pooling
 		return self
 
 	def add_dropout(self, dropout=0.25):
@@ -198,15 +232,18 @@ class ShanyNet:
 			callbacks=[self.history])
 
 		if self.config.enable_saving is True:
-			print("Removing old Model...")
-			# remove content of output folder (clear model data)
-			for the_file in os.listdir(self.config.get_model_output_path()):
-				file_path = os.path.join(self.config.get_model_output_path(), the_file)
-				try:
-					if os.path.isfile(file_path):
-						os.unlink(file_path)
-				except Exception as e:
-					print(e)
+
+			# remove old model when all saving features are enabled
+			if self.config.get_should_save_model() and self.config.get_should_save_weights() and self.config.get_should_save_history():
+				print("Removing old Model...")
+				# remove content of output folder (clear model data)
+				for the_file in os.listdir(self.config.get_model_output_path()):
+					file_path = os.path.join(self.config.get_model_output_path(), the_file)
+					try:
+						if os.path.isfile(file_path):
+							os.unlink(file_path)
+					except Exception as e:
+						print(e)
 
 			if self.config.get_should_save_model() is True and self.config.get_model_name() != '':
 				# save model and weights
@@ -492,7 +529,7 @@ def main():
 
 	# Optimizers:
 	# =============
-	# 'RMSprop'
+	# 'RMSprop' / optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=None, decay=0.0)
 	# 'Adagrad'
 	# 'Adadelta'
 	# 'Adam'
@@ -525,21 +562,21 @@ def main():
 	# sparse
 
 	cfg = CFG(batch=16,
-			epochs=5,
-			classes=4,
+			epochs=10,
+			classes=100,
 			enable_multithreading=True,
-			threads=4,
+			threads=5,
 			class_mode='sparse',
-			optimizer='rmsprop',
+			optimizer=SGD(lr=0.01, momentum=0.0, decay=0.0, nesterov=False),
 			loss_function='sparse_categorical_crossentropy',
-			train_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/train/',
-			validation_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/validation/',
-			infer_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/inference/',
-			model_output_path='/ib/junk/junk/shany_ds/shany_proj/dataset_final_project/model/',
-			model_name='finalproject',
+			train_path='/ib/junk/junk/shany_ds/shany_proj/kaggle_project/train/',
+			validation_path='/ib/junk/junk/shany_ds/shany_proj/kaggle_project/validation/',
+			infer_path='/ib/junk/junk/shany_ds/shany_proj/kaggle_project/inference/',
+			model_output_path='/ib/junk/junk/shany_ds/shany_proj/kaggle_project/model/',
+			model_name='shanynet',
 			load_model_embeddings=False,  # strip dropouts and fc layers
 			compile_metrics=['accuracy'],
-			enable_saving=True,
+			enable_saving=False,
 			save_model=True,
 			save_weights=True,
 			save_history=True)
@@ -549,6 +586,7 @@ def main():
 
 	# creat a net instance with configurations
 	Net = ShanyNet(cfg=cfg)
+	Net.vgg16().compile().train().evaluate()
 
 	# Create a custom CNN net
 	# Net.create()\
@@ -568,6 +606,6 @@ def main():
 
 	cfg.threads = 1
 	res = Net.load_model().plot_history()#.infer()
-	print(res)
+	#print(res)
 
 main()
